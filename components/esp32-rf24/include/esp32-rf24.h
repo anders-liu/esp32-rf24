@@ -30,6 +30,15 @@ typedef struct {
 
 typedef struct rf24_dev_t *rf24_dev_handle_t;
 
+typedef struct {
+    unsigned int rx_data_ready: 1;
+    unsigned int tx_data_sent: 1;
+    unsigned int tx_max_retried: 1;
+    unsigned int rx_pipe_no: 3;  // 0-5, or ``RF24_RX_FIFO_EMPTY``
+    unsigned int tx_full: 1;
+} rf24_status;
+
+#define RF24_RX_FIFO_EMPTY 7
 /**
  * Functions
  */
@@ -55,5 +64,7 @@ esp_err_t rf24_init(rf24_bus_cfg_t *bus_cfg, rf24_dev_handle_t *handle);
  *         - ESP_OK                on success
  */
 esp_err_t rf24_free(rf24_dev_handle_t handle);
+
+esp_err_t rf24_get_status(rf24_dev_handle_t handle, rf24_status *status);
 
 #endif  /* INC__ESP32_RF24__H */
