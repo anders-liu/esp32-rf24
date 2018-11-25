@@ -67,4 +67,6 @@ esp_err_t rf24_free(rf24_dev_handle_t handle);
 
 esp_err_t rf24_get_status(rf24_dev_handle_t handle, rf24_status *status);
 
+esp_err_t rf24_is_chip_connected(rf24_dev_handle_t handle, bool *connected);
+
 #endif  /* INC__ESP32_RF24__H */

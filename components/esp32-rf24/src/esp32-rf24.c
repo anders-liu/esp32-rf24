@@ -148,14 +148,42 @@ struct rf24_dev_t {
 #define RF24_BIT_TEST_10(data, mask) (RF24_BIT_TEST((data), (mask)) ? 1 : 0)
 
 esp_err_t rf24_cmd(rf24_dev_handle_t handle, uint8_t cmd, uint8_t *res) {
-    //esp_err_t ret;
+    esp_err_t ret;
     spi_transaction_t t = {
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA,
         .length = 8,
         .tx_buffer = &cmd,
         .rx_buffer = res
     };
+    t.tx_data[0] = cmd;
 
-    return spi_device_polling_transmit(handle->spi_dev, &t);
+    ret = spi_device_polling_transmit(handle->spi_dev, &t);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "rf24_cmd: spi_device_polling_transmit failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    *res = t.rx_data[0];
+    return ESP_OK;
+}
+
+esp_err_t rf24_read_reg(rf24_dev_handle_t handle, uint8_t reg, uint8_t *data) {
+    esp_err_t ret;
+    spi_transaction_t t = {
+        .flags = SPI_TRANS_USE_TXDATA | SPI_TRANS_USE_RXDATA,
+        .length = 16,
+    };
+    t.tx_data[0] = RF24CMD_R_REGISTER | reg;
+    t.tx_data[1] = RF24CMD_NOP;
+
+    ret = spi_device_polling_transmit(handle->spi_dev, &t);
+    if (ret != ESP_OK) {
+        ESP_LOGW(TAG, "rf24_read_reg: spi_device_polling_transmit failed: %s", esp_err_to_name(ret));
+        return ret;
+    }
+
+    *data = t.rx_data[1];
+    return ESP_OK;
 }
 
 /**
@@ -173,7 +201,7 @@ esp_err_t rf24_init(rf24_bus_cfg_t *bus_cfg, rf24_dev_handle_t *handle) {
 
     struct rf24_dev_t *rf_dev = malloc(sizeof(struct rf24_dev_t));
     if (rf_dev == NULL) {
-        ESP_LOGD(TAG, "malloc failed");
+        ESP_LOGW(TAG, "rf24_init: malloc failed");
         ret = ESP_ERR_NO_MEM;
         goto cleanup;
     }
@@ -194,7 +222,7 @@ esp_err_t rf24_init(rf24_bus_cfg_t *bus_cfg, rf24_dev_handle_t *handle) {
         ret = spi_bus_initialize(bus_cfg->spi_host, &spi_buscfg, 1);
 
         if (ret != ESP_OK) {
-            ESP_LOGD(TAG, "spi_bus_initialize failed: %s", esp_err_to_name(ret));
+            ESP_LOGW(TAG, "rf24_init: spi_bus_initialize failed: %s", esp_err_to_name(ret));
             goto cleanup;
         }
         rf_dev->bus_initialized = true;
@@ -213,7 +241,7 @@ esp_err_t rf24_init(rf24_bus_cfg_t *bus_cfg, rf24_dev_handle_t *handle) {
     ret = spi_bus_add_device(bus_cfg->spi_host, &spi_devcfg, &spi_dev);
 
     if (ret != ESP_OK) {
-        ESP_LOGD(TAG, "spi_bus_add_device failed: %s", esp_err_to_name(ret));
+        ESP_LOGW(TAG, "rf24_init: spi_bus_add_device failed: %s", esp_err_to_name(ret));
         goto cleanup;
     }
     rf_dev->spi_dev = spi_dev;
@@ -281,5 +309,20 @@ esp_err_t rf24_get_status(rf24_dev_handle_t handle, rf24_status *status) {
     };
 
     *status = s;
+    return ESP_OK;
+}
+
+esp_err_t rf24_is_chip_connected(rf24_dev_handle_t handle, bool *connected) {
+    ESP_LOGV(TAG, "rf24_is_chip_connected");
+
+    uint8_t data;
+    esp_err_t ret = rf24_read_reg(handle, RF24REG_SETUP_AW, &data);
+
+    if (ret != ESP_OK) {
+        ESP_LOGD(TAG, "rf24_get_status: read register failed");
+        return ret;
+    }
+
+    *connected = data >= 1 && data <= 3;
     return ESP_OK;
 }

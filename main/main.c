@@ -29,6 +29,7 @@ void app_main() {
 
     ESP_LOGI(TAG, "app_main: RF24 initialized");
 
+    // Get status.
     rf24_status status;
     ret = rf24_get_status(rf24_dev, &status);
 
@@ -44,6 +45,17 @@ void app_main() {
         status.rx_data_ready, status.tx_data_sent,
         status.tx_max_retried, status.rx_pipe_no,
         status.tx_full);
+
+    // Check chip connection.
+    bool is_chip_connected;
+    ret = rf24_is_chip_connected(rf24_dev, &is_chip_connected);
+
+    if(ret != ESP_OK) {
+        ESP_LOGE(TAG, "app_main: rf24_is_chip_connected failed: %s", esp_err_to_name(ret));
+        goto cleanup;
+    }
+
+    ESP_LOGI(TAG, "app_main: RF24 connected: %s", is_chip_connected ? "yes" : "no");
 
 cleanup:
     rf24_free(rf24_dev);
